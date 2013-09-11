@@ -1,0 +1,227 @@
+#!/bin/bash
+
+# Dynaname - Dynamic DNS updater script using nsupdate
+#
+#    Copyright (C) 2013  Frederic Pasteleurs <frederic@askarel.be>
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+ME=$(basename $0)
+# Some sane defaults
+# Where to put the key files and config snippets
+BASEDIR=$(dirname $0)
+DNSKEYGEN="/usr/sbin/dnssec-keygen"
+# Default action: immediate update of DNS record
+DEFACTION="UPDATE"
+TTL=300
+KEYBITS=512
+NSALGORITHM=157
+
+# List of usable algorithms
+NSALGORITHMS=",,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,"
+NSALGORITHMS="$NSALGORITHMS,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,hmac-md5,,,,,,,,,,,,"
+
+# Function to call when we bail out
+die()
+{
+    echo "$ME: $1. Exit"
+    if [ -z "$2" ]; then
+	exit 1
+	else
+	exit $2
+    fi
+}
+
+# Return IP addresses for specified interface
+# Parameter 1: interface name
+# Parameter 2: IP family (-4 for IPv4 only, -6 for IPv6 only, nothing for both)
+# output: IP addresses on one line, nothing if invalid interface or no assigned IP address
+getips()
+{
+    ip $2 addr show dev $1 2>/dev/null | grep "scope global" | grep -v "temporary" | tr -s "\t" " " | cut -d '/' -f 1 | cut -d ' ' -f 3 | tr '\n' ' '
+}
+
+# Validate specified IPv4 address
+# Input: what look like an IP addess
+# Output: Valid IPv4 address, nothing if garbage
+# Thank you Mitch Frazier: http://www.linuxjournal.com/content/validating-ip-address-bash-script
+validatev4()
+{
+    if [[ "$1" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then 
+	OIFS=$IFS
+        IFS='.'
+        ip=($1)
+        IFS=$OIFS
+        test ${ip[0]} -le 255 && test ${ip[1]} -le 255  && test ${ip[2]} -le 255 && test ${ip[3]} -le 255 && echo "$1"
+    fi
+}
+
+# Validate specified IPv6 address
+# Input: what look like an IP addess
+# Output: Valid IPv6 address, nothing if garbage
+# Thank you Florian Streibelt: https://github.com/mutax/IPv6-Address-checks/tree/master/bash
+validatev6()
+{
+    INPUT="$1"
+    while [ "$O" != "$INPUT" ]; do
+	O="$INPUT"
+	# fill all words with zeroes
+	INPUT="$( sed  's|:\([0-9a-f]\{3\}\):|:0\1:|g' <<< "$INPUT" )"
+	INPUT="$( sed  's|:\([0-9a-f]\{3\}\)$|:0\1|g'  <<< "$INPUT")"
+	INPUT="$( sed  's|^\([0-9a-f]\{3\}\):|0\1:|g'  <<< "$INPUT" )"
+
+	INPUT="$( sed  's|:\([0-9a-f]\{2\}\):|:00\1:|g' <<< "$INPUT")"
+	INPUT="$( sed  's|:\([0-9a-f]\{2\}\)$|:00\1|g'  <<< "$INPUT")"
+	INPUT="$( sed  's|^\([0-9a-f]\{2\}\):|00\1:|g'  <<< "$INPUT")"
+
+	INPUT="$( sed  's|:\([0-9a-f]\):|:000\1:|g'  <<< "$INPUT")"
+	INPUT="$( sed  's|:\([0-9a-f]\)$|:000\1|g'   <<< "$INPUT")"
+	INPUT="$( sed  's|^\([0-9a-f]\):|000\1:|g'   <<< "$INPUT")"
+    done
+    # now expand the ::
+    grep -qs "::" <<< "$INPUT"
+    if [ "$?" -eq 0 ]; then
+	GRPS="$(sed  's|[0-9a-f]||g' <<< "$INPUT" | wc -m)"
+	((GRPS--)) # carriage return
+	((MISSING=8-GRPS))
+	for ((i=0;i<$MISSING;i++)); do
+	    ZEROES="$ZEROES:0000"
+	done
+	# be careful where to place the :
+	INPUT="$( sed  's|\(.\)::\(.\)|\1'$ZEROES':\2|g'   <<< "$INPUT")"
+	INPUT="$( sed  's|\(.\)::$|\1'$ZEROES':0000|g'   <<< "$INPUT")"
+	INPUT="$( sed  's|^::\(.\)|'$ZEROES':0000:\1|g;s|^:||g'   <<< "$INPUT")"
+    fi
+    # an expanded address has 39 chars + CR
+    if [ $(echo $INPUT | wc -m) = 40 ]; then
+	echo "$INPUT"
+    fi
+}
+
+# helpful help text is helpful
+usage()
+{
+    echo "Usage: $ME [options] hostname"
+    echo "Options:"
+    echo "	-4		IPv4 only"
+    echo "	-6		IPv6 only"
+    echo "	-A address	Update name with specified address"
+    echo "	-G		Generate keypair and server side configuration snippet"
+    echo "	-H hostname	Update this hostname"
+    echo "	-I interface	Get informations from specified interface"
+    echo "	-K key		Use specified key. Determine key using host name by default. Keys are stored in $BASEDIR/"
+    echo "	-S address	Update this DNS server"
+    echo "	-T ttl		DNS record Time to live (default:$TTL)"
+    exit 1
+}
+
+# Input: list of IP addresses to check
+# Output: IP addresses string without reference to localhost
+striplocalhost()
+{
+for i in $* ; do
+	test "$i" != "127.0.0.1" && test "$i" != "::1" && echo -n "$i "
+done
+
+}
+
+## Sanity check
+test "$#" -eq "0" && echo "Please supply parameters" && usage
+
+while getopts ":h46A:GH:I:K:S:T:" OPTION
+    do
+	case "$OPTION" in
+	    4)	test "$IPFAMILY" = "-6" && die "option -4 cannot be used together with option -6 (do not supply -4 or -6 if you want dual stack)"
+		IPFAMILY="-4"
+		;;
+	    6)	test "$IPFAMILY" = "-4" && die "option -6 cannot be used together with option -4 (do not supply -4 or -6 if you want dual stack)"
+		IPFAMILY="-6"
+		;;
+	    A)	IPADDRESS="$IPADDRESS $OPTARG"
+		;;
+	    D)	DEFACTION="DAEMONIZE"
+		;;
+	    G)	DEFACTION="KEYGEN"
+		;;
+	    H)	DNSHOSTNAME="$OPTARG"
+		;;
+	    I)	IPADDRESS="$(getips "$OPTARG" "$IPFAMILY") $IPADDRESS"
+		;;
+	    K)	NSKEY="$OPTARG"
+		;;
+	    S)	DNSSERVER="$OPTARG"
+		;;
+	    T)	TTL="$OPTARG"
+		;;
+	    :)	echo "$ME: Option -$OPTARG requires an argument."
+		usage
+		;;
+	    \?)	echo "$ME: Invalid option: -$OPTARG"
+		usage
+		;;
+	    h)	usage
+		;;
+	esac
+done
+
+IPADDRESS="$(striplocalhost $IPADDRESS)"
+test -z "$DNSHOSTNAME" && die "No host name to update (-H option is missing)"
+test -z "$DNSSERVER" && die "You must specify the DNS server I need to update (option -S)"
+DNSHOSTNAME="$DNSHOSTNAME."
+test -z "$NSKEY" && NSKEY="$DNSHOSTNAME"
+# Might be a symlink. Read it
+test -L "$BASEDIR/$NSKEY.private" && NSKEY=$(readlink -f "$BASEDIR/$NSKEY.private")
+
+case "$DEFACTION" in
+	UPDATE)
+	    test -f "$NSKEY" || die "Key $NSKEY for hostname $DNSHOSTNAME not found. Create it with option -G"
+	    NSFILE="$(mktemp $ME.XXXXXXXXXXXXXX)"
+	    echo "server $DNSSERVER" >> $NSFILE
+	    echo "zone $(echo "$DNSHOSTNAME"|cut -d '.' -f 2-)" >> $NSFILE
+	    test "$IPFAMILY" = "-6" || (echo "update delete $DNSHOSTNAME A") >> $NSFILE
+	    test "$IPFAMILY" = "-4" || (echo "update delete $DNSHOSTNAME AAAA") >> $NSFILE
+	    echo "update delete $DNSHOSTNAME TXT" >> $NSFILE
+	    for i in $IPADDRESS ; do
+	        test "$IPFAMILY" = "-6" || (test -n "$(validatev4 $i)" && echo "update add $DNSHOSTNAME $TTL A $i") >> $NSFILE
+	        test "$IPFAMILY" = "-4" || (test -n "$(validatev6 $i)" && echo "update add $DNSHOSTNAME $TTL AAAA $i") >> $NSFILE
+	    done
+	    echo "update add $DNSHOSTNAME $TTL TXT \"Last update: $(date -R)\"" >> $NSFILE
+	    echo "send" >> $NSFILE
+	    echo "quit" >> $NSFILE
+	    cat $NSFILE | nsupdate -k $NSKEY
+	    rm $NSFILE
+	;;
+	KEYGEN)
+	    test -x $DNSKEYGEN || die "Cannot generate keypair: $DNSKEYGEN not found"
+	    test -f "$NSKEY" && die "Key $NSKEY for hostname $DNSHOSTNAME already exist. You need to delete it"
+	    OLDPWD="$PWD"
+	    cd $BASEDIR
+	    KEYNAME="$($DNSKEYGEN -a $(echo "$NSALGORITHMS" | cut -d ',' -f $NSALGORITHM) -b $KEYBITS -n USER $DNSHOSTNAME)"
+	    ln -s "$KEYNAME.private" "$NSKEY.private"
+	    ln -s "$KEYNAME.key" "$NSKEY.key"
+	    # Create server-side configuration directory
+	    mkdir -p "$BASEDIR/$DNSSERVER/etc/bind/"
+	    # XXX Add server-side config generration here
+	    cd "$OLDPWD"
+	;;
+	DAEMONIZE)
+	    die "no daemon mode yet"
+	    # Lazy mode on: call me with right parameters
+	    $0 $IPFAMILY
+	;;
+	*)
+	    die "Whoa dude !! What happened here ?"
+	;;
+esac

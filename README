@@ -1,0 +1,54 @@
+
+ Dynaname - Your dynamic DNS, on YOUR domain name, on YOUR infrastructure.
+
+WHY ?
+-----
+
+There are two big players in the field: Dyn.com (ex-DynDNS) and no-ip.com.
+
+Recently, one of the most popular provider (dyn.com) decided to get rid of their
+free (as in free beer) service. 
+To push users to the pay version, they're forcing their users to login at least once
+a month on their web interface. After a month without web activity, the domain will be 
+frozen and then deleted, which is really cumbersome and can be easily forgotten.
+A script can of course be written to work around that, but it is just a temporary dirty fix.
+
+No-IP.com do not have a high presence in Europe, which can be problematic at times.
+
+They are both US-centric, which is a problem after the messy NSA scandal, or you 
+may want to eat from their turf. :-)
+
+My opinion is that if you need to pay for such a service, it has to be hammered down to 
+YOUR specifications.
+
+HOW ?
+-----
+
+Latest versions of BIND (The Berkeley Internet Name Daemon) have provisions for dynamic
+update of the zone records, this script is just a wrapper around the nsupdate utility
+and is designed to be mostly foolproof, didactic (it will generate configuration snippets
+to install on your DNS server) and easy to use.
+
+TODO
+----
+
+This script is in the early stage, but is already somewhat useable.
+
+- Generate server side config files
+- Daemon mode
+- Query web site for IP addresses (useful when the daemon run on another box than the router)
+- Cron setup (register/unregister)
+- Documentation
+
+NEEDED BEFORE YOU START
+-----------------------
+
+client side:
+- A linux machine (I need *BSD testers)
+- The Bourne Again Shell (bash) (Not tested on Busybox Ash)
+- nspdate binary (to update the DNS server)
+- dnssec-keygen  (to generate keypairs)
+Server side:
+- A server with static public IP addresses
+- ISC BIND 9 on the server
+- Your favorite domain name to play with

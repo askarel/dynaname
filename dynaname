@@ -179,7 +179,9 @@ done
 IPADDRESS="$(striplocalhost $IPADDRESS)"
 test -z "$DNSHOSTNAME" && die "No host name to update (-H option is missing)"
 test -z "$DNSSERVER" && die "You must specify the DNS server I need to update (option -S)"
-DNSHOSTNAME="$DNSHOSTNAME."
+# drop trailing dot
+DNSHOSTNAME="${DNSHOSTNAME%.}"
+DNSZONE=$(echo "$DNSHOSTNAME"|cut -d '.' -f 2-)
 test -z "$NSKEY" && NSKEY="$DNSHOSTNAME"
 # Might be a symlink. Read it
 test -L "$BASEDIR/$NSKEY.private" && NSKEY=$(readlink -f "$BASEDIR/$NSKEY.private")
@@ -189,7 +191,7 @@ case "$DEFACTION" in
 	    test -f "$NSKEY" || die "Key $NSKEY for hostname $DNSHOSTNAME not found. Create it with option -G"
 	    NSFILE="$(mktemp $ME.XXXXXXXXXXXXXX)"
 	    echo "server $DNSSERVER" >> $NSFILE
-	    echo "zone $(echo "$DNSHOSTNAME"|cut -d '.' -f 2-)" >> $NSFILE
+	    echo "zone $DNSZONE" >> $NSFILE
 	    test "$IPFAMILY" = "-6" || (echo "update delete $DNSHOSTNAME A") >> $NSFILE
 	    test "$IPFAMILY" = "-4" || (echo "update delete $DNSHOSTNAME AAAA") >> $NSFILE
 	    echo "update delete $DNSHOSTNAME TXT" >> $NSFILE
@@ -197,7 +199,7 @@ case "$DEFACTION" in
 	        test "$IPFAMILY" = "-6" || (test -n "$(validatev4 $i)" && echo "update add $DNSHOSTNAME $TTL A $i") >> $NSFILE
 	        test "$IPFAMILY" = "-4" || (test -n "$(validatev6 $i)" && echo "update add $DNSHOSTNAME $TTL AAAA $i") >> $NSFILE
 	    done
-	    echo "update add $DNSHOSTNAME $TTL TXT \"Last update: $(date -R)\"" >> $NSFILE
+	    echo "update add $DNSHOSTNAME $TTL TXT \"Last update: $(TZ=UTC date "+%Y-%m-%d %H:%M:%S UTC")\"" >> $NSFILE
 	    echo "send" >> $NSFILE
 	    echo "quit" >> $NSFILE
 	    cat $NSFILE | nsupdate -k $NSKEY
@@ -213,7 +215,20 @@ case "$DEFACTION" in
 	    ln -s "$KEYNAME.key" "$NSKEY.key"
 	    # Create server-side configuration directory
 	    mkdir -p "$BASEDIR/$DNSSERVER/etc/bind/"
-	    # XXX Add server-side config generration here
+            cat > $BASEDIR/$DNSSERVER/etc/bind/dynaname.conf <<EOF
+key $NSKEY {
+        algorithm HMAC-MD5;
+        secret "`cut -d" " -f7- $NSKEY.key`";
+};
+
+zone "$DNSZONE" in {
+        type master;
+        file "dyn/$DNSZONE";
+        update-policy {
+                grant $DNSHOSTNAME name $DNSHOSTNAME A AAAA TXT;
+        };
+};
+EOF
 	    cd "$OLDPWD"
 	;;
 	DAEMONIZE)

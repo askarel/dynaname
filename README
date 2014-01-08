@@ -36,7 +36,7 @@ This script is in the early stage, but is already somewhat useable.
 
 - Generate server side config files
 - Daemon mode
-- Query web site for IP addresses (useful when the daemon run on another box than the router)
+- Query web site for IP addresses (useful when the daemon runs on another box than the router)
 - Cron setup (register/unregister)
 - Documentation
 
@@ -46,7 +46,7 @@ NEEDED BEFORE YOU START
 client side:
 - A linux machine (I need *BSD testers)
 - The Bourne Again Shell (bash) (Not tested on Busybox Ash)
-- nspdate binary (to update the DNS server)
+- nsupdate binary (to update the DNS server)
 - dnssec-keygen  (to generate keypairs)
 Server side:
 - A server with static public IP addresses

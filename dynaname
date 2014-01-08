@@ -199,7 +199,7 @@ case "$DEFACTION" in
 	        test "$IPFAMILY" = "-6" || (test -n "$(validatev4 $i)" && echo "update add $DNSHOSTNAME $TTL A $i") >> $NSFILE
 	        test "$IPFAMILY" = "-4" || (test -n "$(validatev6 $i)" && echo "update add $DNSHOSTNAME $TTL AAAA $i") >> $NSFILE
 	    done
-	    echo "update add $DNSHOSTNAME $TTL TXT \"Last update: $(date -R)\"" >> $NSFILE
+	    echo "update add $DNSHOSTNAME $TTL TXT \"Last update: $(TZ=UTC date "+%Y-%m-%d %H:%M:%S UTC")\"" >> $NSFILE
 	    echo "send" >> $NSFILE
 	    echo "quit" >> $NSFILE
 	    cat $NSFILE | nsupdate -k $NSKEY

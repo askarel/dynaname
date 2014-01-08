@@ -179,7 +179,8 @@ done
 IPADDRESS="$(striplocalhost $IPADDRESS)"
 test -z "$DNSHOSTNAME" && die "No host name to update (-H option is missing)"
 test -z "$DNSSERVER" && die "You must specify the DNS server I need to update (option -S)"
-DNSHOSTNAME="$DNSHOSTNAME."
+# drop trailing dot
+DNSHOSTNAME="${DNSHOSTNAME%.}"
 DNSZONE=$(echo "$DNSHOSTNAME"|cut -d '.' -f 2-)
 test -z "$NSKEY" && NSKEY="$DNSHOSTNAME"
 # Might be a symlink. Read it

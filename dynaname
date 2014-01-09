@@ -180,6 +180,7 @@ IPADDRESS="$(striplocalhost $IPADDRESS)"
 test -z "$DNSHOSTNAME" && die "No host name to update (-H option is missing)"
 test -z "$DNSSERVER" && die "You must specify the DNS server I need to update (option -S)"
 # drop trailing dot
+DNSSERVER="${DNSSERVER%.}"
 DNSHOSTNAME="${DNSHOSTNAME%.}"
 DNSZONE=$(echo "$DNSHOSTNAME"|cut -d '.' -f 2-)
 test -z "$NSKEY" && NSKEY="$DNSHOSTNAME"
@@ -228,6 +229,15 @@ zone "$DNSZONE" in {
                 grant $DNSHOSTNAME name $DNSHOSTNAME A AAAA TXT;
         };
 };
+EOF
+            cat > $BASEDIR/$DNSSERVER/etc/bind/$DNSZONE <<EOF
+@ IN  SOA  $DNSSERVER. root.$DNSZONE. (
+     $(date +%s)
+     8h
+     35m
+     50d
+     1d)
+        NS $DNSSERVER.
 EOF
 	    cd "$OLDPWD"
 	;;

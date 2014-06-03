@@ -30,8 +30,8 @@ KEYBITS=512
 NSALGORITHM=157
 
 # List of usable algorithms
-NSALGORITHMS=",,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,"
-NSALGORITHMS="$NSALGORITHMS,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,hmac-md5,,,,,,,,,,,,"
+NSALGORITHMS=",DH,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,"
+NSALGORITHMS="$NSALGORITHMS,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,hmac-md5,,,,hmac-sha1,hmac-sha224,,hmac-sha384,hmac-sha512,,,,"
 
 # Function to call when we bail out
 die()

@@ -52,3 +52,9 @@ Server side:
 - A server with static public IP addresses
 - ISC BIND 9 on the server
 - Your favorite domain name to play with
+
+CREDITS
+-------
+- Bernhard M. Wiedemann: many patches
+- Florian Streibelt: IPv6 address validation code (https://github.com/mutax/IPv6-Address-checks/tree/master/bash)
+- Mitch Frazier: IPv4 address validation code (http://www.linuxjournal.com/content/validating-ip-address-bash-script)

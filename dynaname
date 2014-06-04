@@ -27,7 +27,7 @@ DNSKEYGEN="/usr/sbin/dnssec-keygen"
 DEFACTION="UPDATE"
 TTL=300
 KEYBITS=512
-NSALGORITHM=157
+NSALGORITHM=165
 
 # List of usable algorithms
 NSALGORITHMS=",DH,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,"

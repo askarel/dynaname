@@ -190,21 +190,20 @@ test -L "$BASEDIR/$NSKEY.private" && NSKEY=$(readlink -f "$BASEDIR/$NSKEY.privat
 case "$DEFACTION" in
 	UPDATE)
 	    test -f "$NSKEY" || die "Key $NSKEY for hostname $DNSHOSTNAME not found. Create it with option -G"
-	    NSFILE="$(mktemp $ME.XXXXXXXXXXXXXX)"
-	    echo "server $DNSSERVER" >> $NSFILE
-	    echo "zone $DNSZONE" >> $NSFILE
-	    test "$IPFAMILY" = "-6" || (echo "update delete $DNSHOSTNAME A") >> $NSFILE
-	    test "$IPFAMILY" = "-4" || (echo "update delete $DNSHOSTNAME AAAA") >> $NSFILE
-	    echo "update delete $DNSHOSTNAME TXT" >> $NSFILE
-	    for i in $IPADDRESS ; do
-	        test "$IPFAMILY" = "-6" || (test -n "$(validatev4 $i)" && echo "update add $DNSHOSTNAME $TTL A $i") >> $NSFILE
-	        test "$IPFAMILY" = "-4" || (test -n "$(validatev6 $i)" && echo "update add $DNSHOSTNAME $TTL AAAA $i") >> $NSFILE
-	    done
-	    echo "update add $DNSHOSTNAME $TTL TXT \"Last update: $(TZ=UTC date "+%Y-%m-%d %H:%M:%S UTC")\"" >> $NSFILE
-	    echo "send" >> $NSFILE
-	    echo "quit" >> $NSFILE
-	    cat $NSFILE | nsupdate -k $NSKEY
-	    rm $NSFILE
+	    (
+		echo "server $DNSSERVER"
+		echo "zone $DNSZONE"
+		test "$IPFAMILY" = "-6" || echo "update delete $DNSHOSTNAME A"
+		test "$IPFAMILY" = "-4" || echo "update delete $DNSHOSTNAME AAAA"
+		echo "update delete $DNSHOSTNAME TXT"
+		for i in $IPADDRESS ; do
+		    test "$IPFAMILY" = "-6" || (test -n "$(validatev4 $i)" && echo "update add $DNSHOSTNAME $TTL A $i")
+		    test "$IPFAMILY" = "-4" || (test -n "$(validatev6 $i)" && echo "update add $DNSHOSTNAME $TTL AAAA $i")
+		done
+		echo "update add $DNSHOSTNAME $TTL TXT \"Last update: $(TZ=UTC date "+%Y-%m-%d %H:%M:%S UTC")\""
+		echo "send"
+		echo "quit"
+	    ) | nsupdate -k $NSKEY || exit $?
 	;;
 	KEYGEN)
 	    test -x $DNSKEYGEN || die "Cannot generate keypair: $DNSKEYGEN not found"

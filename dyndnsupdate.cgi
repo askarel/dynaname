@@ -3,7 +3,7 @@
 # Licensed under GPL v3 or later (see LICENSE file)
 #
 # use in FritzBox as custom Dynamic DNS provider with
-# https://yourserver.domain/dyndnsupdate.cgi?hostname=<domain>&myip=<ipaddr>&dnsserver=<username>&key=<pass>
+# https://yourserver.domain/dyndnsupdate.cgi?hostname=<domain>&myip=<ipaddr>&dnsserver=<username>&key=URLENCODEDKxxx.keyFILE
 
 use strict;
 use CGI ':standard';
@@ -65,9 +65,15 @@ if(param()) {
         "Key: $key[6]$key[7]\n".
         "Bits: AAA=\n";
     close $tmpfile;
+    print "Updating...\n",br;
     open(my $pipe, "| nsupdate -k $tmpfilename") or die $!;
     print $pipe $request;
     close $pipe;
+    if($?>>8) {
+        print "An error occurred. code ",$?>>8;
+    } else {
+        print "Updated successfully.";
+    }
     unlink $tmpfilename, $tmpfilename2;
 }
 

@@ -20,6 +20,6 @@
 
 # This is going to be terse
 
-printf 'Content-type: text/plain\n\n'
+printf 'Content-type: text/plain\r\n\r\n'
 
 echo "$REMOTE_ADDR"

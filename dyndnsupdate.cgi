@@ -29,19 +29,24 @@ if(param()) {
     if(!$options{myip}) {
         # use sender's addr
         $options{myip}=$ENV{HTTP_X_FORWARDED_FOR} || $ENV{REMOTE_ADDR};
-        $options{myip}=~s/::ffff://
+        $options{myip}=~s/^::ffff://
     }
-    $options{myip}=~s/[^0-9.:]//g; # sanitize
+    $options{myip}=lc($options{myip});
+    $options{myip}=~s/[^0-9a-f.:]//g; # sanitize
     foreach my $p (qw(dnsserver hostname)) {
         $options{$p}=~s/[^0-9a-z.-]//g; # sanitize
     }
     (my $zone=$options{hostname})=~s/^[0-9a-z-]+\.//;
+    my $rr="A"; # assume IPv4 by default
+    if($options{myip}=~/:/) {
+        $rr="AAAA";
+    }
     my $time=POSIX::strftime('%F %H:%M:%S UTC', gmtime);
     my $request =
         "server $options{dnsserver}\n".
         "zone $zone\n".
-        "update delete $options{hostname} A\n".
-        "update add $options{hostname} 300 A $options{myip}\n".
+        "update delete $options{hostname} $rr\n".
+        "update add $options{hostname} 300 $rr $options{myip}\n".
         "update delete $options{hostname} TXT\n".
         "update add $options{hostname} 300 TXT \"Last update: $time\"\n".
         "send\nquit\n";

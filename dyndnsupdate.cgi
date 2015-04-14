@@ -11,6 +11,7 @@ use POSIX 'strftime';
 use File::Temp ':mktemp';
 
 my $debug=0;
+my $ttl=300;
 
 print header(),start_html(-title=>"dynamic DNS updater"),
     start_form(-method=>"get"),
@@ -46,9 +47,9 @@ if(param()) {
         "server $options{dnsserver}\n".
         "zone $zone\n".
         "update delete $options{hostname} $rr\n".
-        "update add $options{hostname} 300 $rr $options{myip}\n".
+        "update add $options{hostname} $ttl $rr $options{myip}\n".
         "update delete $options{hostname} TXT\n".
-        "update add $options{hostname} 300 TXT \"Last update: $time\"\n".
+        "update add $options{hostname} $ttl TXT \"Last update: $time\"\n".
         "send\nquit\n";
     if($debug) {
         open(DEBUG, ">", "/tmp/dyndns.log");

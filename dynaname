@@ -200,6 +200,7 @@ case "$DEFACTION" in
 		    test "$IPFAMILY" = "-6" || (test -n "$(validatev4 $i)" && echo "update add $DNSHOSTNAME $TTL A $i")
 		    test "$IPFAMILY" = "-4" || (test -n "$(validatev6 $i)" && echo "update add $DNSHOSTNAME $TTL AAAA $i")
 		done
+		[ -z "$TXTRECORD" ] || echo "update add $DNSHOSTNAME $TTL TXT \"$TXTRECORD\""
 		echo "update add $DNSHOSTNAME $TTL TXT \"Last update: $(TZ=UTC date "+%Y-%m-%d %H:%M:%S UTC")\""
 		echo "send"
 		echo "quit"
